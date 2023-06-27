@@ -27,6 +27,8 @@ module Gruis
         @kanji_index = {}
         @comp_index  = {}
         @vocab_index = {}
+        @kanji_comp_by_kanji = Hash.new { |h,k| h[k] = {} }
+        @comp_by_kanji = Hash.new { |h,k| h[k] = {} }
         config_cache! if cache
       end
 
@@ -53,7 +55,12 @@ module Gruis
 
       # Find all vocabulary compounds which contain the given kanji
       def comps_for(kanji_subject)
-        raise NotImplementedError
+        @comp_by_kanji[kanji_subject.to_s].values
+      end
+
+      # Find all kanji-only vocabulary compounds which contain the given kanji
+      def kanji_comps_for(kanji_subject)
+        @kanji_comp_by_kanji[kanji_subject.to_s].values
       end
 
       def subjects(types = @subjects)
@@ -72,6 +79,14 @@ module Gruis
           @id_index[s.id] = s 
           if s.kanji?
             @kanji_index[s.to_s] = s
+          end
+        end
+        subs.each do |s|
+          if s.vocabulary?
+            kanjis_for(s).each {|k| @comp_by_kanji[k.to_s][s.to_s] = s }
+            if s.is_compound?
+              kanjis_for(s).each {|k| @kanji_comp_by_kanji[k.to_s][s.to_s] = s }
+            end
           end
         end
         subs
