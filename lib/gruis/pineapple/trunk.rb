@@ -11,7 +11,7 @@ module Gruis
       end
 
       def [](text)
-        @subjects[text]
+        @subjects.kanji[text] || @subjects.vocabulary[text]
       end
 
       def add(*subs)
@@ -43,17 +43,24 @@ module Gruis
       end
 
       def kanjis_for(subject)
-        subject.component_subject_ids.map { |sid| subject_by_id(sid) }
+        sub = subject.is_a?(String) ? @subjects.vocabulary[subject] : subject
+        raise ArgumentError.new("unknown subject #{subject}") unless sub
+        sub.component_subject_ids.map { |sid| subject_by_id(sid) }
       end
 
       # Find all vocabulary compounds which contain the given kanji
       def comps_for(kanji_subject)
-        @comp_by_kanji[kanji_subject.to_s].values
+        sub = kanji_subject.is_a?(String) ? @subjects.kanji[kanji_subject] : kanji_subject
+        raise ArgumentError.new("unknown kanji subject #{subject}") unless sub
+        @comp_by_kanji[sub.to_s].values
       end
 
       # Find all kanji-only vocabulary compounds which contain the given kanji
       def kanji_comps_for(kanji_subject)
-        @kanji_comp_by_kanji[kanji_subject.to_s].values
+        sub = kanji_subject.is_a?(String) ? @subjects.kanji[kanji_subject] : kanji_subject
+        raise ArgumentError.new("unknown kanji subject #{subject}") unless sub
+
+        @kanji_comp_by_kanji[sub.to_s].values
       end
 
       def subject_by_id(id)

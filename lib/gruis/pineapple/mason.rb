@@ -15,6 +15,24 @@ module Gruis
         $stderr.puts yield if block_given?
       end
 
+      # kanji frequency
+      def four
+        freqs = Hash[trunk.kanji.map { |k| [k.to_s, 1] }]
+        ttlcomps = (trunk.kanji_vocab_compounds.length).to_f
+        freqs.keys.each do |k|
+          comps = trunk.kanji_comps_for(k)
+          if comps.length == 0
+            freqs[k] = 0
+          else
+            ratio = (comps.length).to_f / ttlcomps
+            freqs[k] = ratio
+          end
+        end
+        freqs = freqs.sort_by {|k,v| v }.to_h
+        puts freqs
+        freqs
+      end
+
       # collision frequency
       def three
         # TODO: we probably want to take the X-kanji compounds that have the fewest similarities between them and other compounds
