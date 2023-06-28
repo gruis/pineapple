@@ -21,21 +21,12 @@ module Gruis
         @apirev   = rev
         @cache    = cache
         @memos    = {}
-        @types    = types
+        @def_types    = types
 
-        @id_index    = {}
-        @kanji_index = {}
-        @comp_index  = {}
-        @vocab_index = {}
-        @kanji_comp_by_kanji = Hash.new { |h,k| h[k] = {} }
-        @comp_by_kanji = Hash.new { |h,k| h[k] = {} }
-        config_cache! if cache
+       config_cache! if cache
       end
 
-
-
-
-      def subjects(types = @types)
+      def subjects(types = @def_types)
         memoize(types) do 
           cache("/v2/subjects") do
               paginated_data("/v2/subjects") { |req| req.params["types"] = types }
