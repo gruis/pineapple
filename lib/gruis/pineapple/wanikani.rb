@@ -1,7 +1,7 @@
 require 'json'
 require 'faraday'
 require 'vcr'
-require 'gruis/pineapple/wanikani/subject'
+require 'gruis/pineapple/subject'
 
 
 module Gruis
@@ -14,14 +14,14 @@ module Gruis
 
       attr_reader :id_index
 
-      def initialize(apikey, log: false, url: WANIKANI_APIURL, rev: WANIKANI_APIREV, cache: false, subjects: "kanji,vocabulary")
+      def initialize(apikey, log: false, url: WANIKANI_APIURL, rev: WANIKANI_APIREV, cache: false, types: "kanji,vocabulary")
         @apikey   = apikey
         @log      = log
         @apiurl   = url
         @apirev   = rev
         @cache    = cache
         @memos    = {}
-        @subjects = subjects
+        @types    = types
 
         @id_index    = {}
         @kanji_index = {}
@@ -32,68 +32,16 @@ module Gruis
         config_cache! if cache
       end
 
-      def kanji
-        @kanji ||= subjects.select(&:kanji?)
-      end
 
-      def kanji_vocab
-        @kanji_vocab ||= vocab.select(&:is_only_kanji?) 
-      end
 
-      def kanji_vocab_compounds
-        @kanji_vocab_compounds ||= kanji_vocab
-          .select(&:is_compound?)
-      end
 
-      def vocab
-        @vocab ||= subjects.select(&:vocabulary?)
-      end
-
-      def kanjis_for(subject)
-        subject.component_subject_ids.map { |sid| subject_by_id(sid) }
-      end
-
-      # Find all vocabulary compounds which contain the given kanji
-      def comps_for(kanji_subject)
-        @comp_by_kanji[kanji_subject.to_s].values
-      end
-
-      # Find all kanji-only vocabulary compounds which contain the given kanji
-      def kanji_comps_for(kanji_subject)
-        @kanji_comp_by_kanji[kanji_subject.to_s].values
-      end
-
-      def subjects(types = @subjects)
+      def subjects(types = @types)
         memoize(types) do 
           cache("/v2/subjects") do
-            index!(
               paginated_data("/v2/subjects") { |req| req.params["types"] = types }
                 .map{|s| Subject.new(s) }
-            )
           end
         end
-      end
-
-      def index!(subs)
-        subs.each do |s| 
-          @id_index[s.id] = s 
-          if s.kanji?
-            @kanji_index[s.to_s] = s
-          end
-        end
-        subs.each do |s|
-          if s.vocabulary?
-            kanjis_for(s).each {|k| @comp_by_kanji[k.to_s][s.to_s] = s }
-            if s.is_compound?
-              kanjis_for(s).each {|k| @kanji_comp_by_kanji[k.to_s][s.to_s] = s }
-            end
-          end
-        end
-        subs
-      end
-
-      def subject_by_id(id)
-        @id_index[id]
       end
 
       private 

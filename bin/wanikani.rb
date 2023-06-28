@@ -4,6 +4,7 @@ require 'bundler/setup'
 require 'dotenv/load'
 
 require 'gruis/pineapple/wanikani'
+require 'gruis/pineapple/trunk'
 require 'gruis/pineapple/mason'
 
 
@@ -17,5 +18,5 @@ end
 cache    = File.expand_path("../../cache/wanikani", __FILE__)
 log      = false
 wanikani = Gruis::Pineapple::Wanikani.new(WANIKANI_APIKEY, log: log, cache: cache)
-
-Gruis::Pineapple::Mason.new(wanikani, log: true).three
+trunk = Gruis::Pineapple::Trunk.new(wanikani.subjects)
+Gruis::Pineapple::Mason.new(trunk, log: true).three
