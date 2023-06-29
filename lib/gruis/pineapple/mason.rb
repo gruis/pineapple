@@ -91,6 +91,25 @@ module Gruis
         }
       end
 
+
+      # adaptive frequency
+      def five
+        kanji_unused = {}
+        kanji_used   = {}
+        study_list   = {}
+
+        kanji_list   = kanji_freqs.drop_while do |k,f| 
+          # any compound with a frequency of 0 are not used in a compound, so
+          # skip them, but keep a record
+          if f == 0 
+            kanji_unused[k] = f 
+            true
+          end
+        end
+
+
+      end
+
       # kanji frequency
       def four
         kanji_unused = {}
