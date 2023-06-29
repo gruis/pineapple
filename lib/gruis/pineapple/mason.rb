@@ -5,7 +5,7 @@ module Gruis
       attr_reader :trunk
 
       def initialize(trunk, log: false)
-        @log = log
+        @log   = log
         @trunk = trunk
       end
 
@@ -15,15 +15,15 @@ module Gruis
         $stderr.puts yield if block_given?
       end
 
-      def suggestions(subject)
-        trunk.kanji_comps_for(subject).map(&:to_s) 
+      def suggestions(subject, source = trunk)
+        source.kanji_comps_for(subject).map(&:to_s) 
           .map do |c| 
             [
               c, 
               # average frequency for each kanji in the compound
-              compound_freqs[c], 
+              source.stats.compound_freqs[c], 
               # average frequency for each kanji except the target kanji
-              compound_freq(*c.each_char.reject { |k| k == subject.to_s })
+              source.stats.compound_freq(*c.each_char.reject { |k| k == subject.to_s })
             ] 
           end
           .sort_by { |cf| cf.last }
@@ -32,45 +32,6 @@ module Gruis
       def suggestions_one(*subjects)
         subjects.map { |s| trunk.kanji_comps_for(s).map(&:to_s) }
           .reduce {|a,b| a & b }
-      end
-
-      def kanji_freqs
-        @kanji_freq ||= kanji_freqs!
-      end
-
-      def kanji_freqs!
-        freqs = Hash[trunk.kanji.map { |k| [k.to_s, 1] }]
-        ttlcomps = (trunk.kanji_vocab_compounds.length).to_f
-        freqs.keys.each do |k|
-          comps = trunk.kanji_comps_for(k)
-          if comps.length == 0
-            freqs[k] = 0
-          else
-            ratio = (comps.length).to_f / ttlcomps
-            freqs[k] = ratio
-          end
-        end
-        freqs.sort_by {|k,v| v }.to_h
-      end
-
-      def compound_freq(*kanjis)
-        kanjis = kanjis.map(&:to_s)
-        cnt    = kanjis.length.to_f
-        freqs  = kanjis.map { |k| kanji_freqs[k] || 0 }
-        total  = freqs.reduce(&:+)
-        freq   = total / cnt
-      end
-
-      def compound_freqs
-        @compound_freq ||= compound_freq!
-      end
-
-      def compound_freqs!
-        kanji_freqs = kanji_freqs
-        compounds = trunk.kanji_vocab_compounds.map do |c|
-         [c.to_s, compound_freq(*trunk.kanjis_for(c))]
-        end
-        Hash[compounds.sort_by{ |f| f.last }]
       end
 
       # summarize the results of a mason builder run - good for quickly
@@ -116,7 +77,7 @@ module Gruis
         kanji_used   = {}
         study_list   = {}
 
-        kanji_list   = kanji_freqs.drop_while do |k,f| 
+        kanji_list   = trunk.stats.kanji_freqs.drop_while do |k,f| 
           # any compound with a frequency of 0 are not used in a compound, so
           # skip them, but keep a record
           if f == 0 
@@ -137,7 +98,7 @@ module Gruis
             .find { |cf| cf[0].each_char.none? { |k| kanji_used[k] } }
           if comp
             study_list[comp[0]] = comp[1] # record the composite frequency for the compound
-            comp[0].each_char { |k| kanji_used[k] = kanji_freqs[k] }
+            comp[0].each_char { |k| kanji_used[k] = trunk.stats.kanji_freqs[k] }
           end
         end
         kanji_list.each { |k,f| kanji_unused[k] = f unless kanji_used[k] }

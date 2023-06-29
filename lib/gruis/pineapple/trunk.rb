@@ -1,3 +1,4 @@
+require 'gruis/pineapple/trunk/stats'
 module Gruis
   module Pineapple
     # Trunk holds all possible Subjects gathered from various sources, e.g., Wanikani
@@ -10,6 +11,10 @@ module Gruis
         add(*subjects)
       end
 
+      def stats
+        @stats ||= Stats.new(self)
+      end
+
       def [](text)
         @subjects.kanji[text] || @subjects.vocabulary[text]
       end
@@ -19,6 +24,24 @@ module Gruis
           @subjects[sub.type][sub.to_s] = sub unless @subjects[sub.type][sub.to_s]
         end
         index!
+      end
+
+      def del(sub)
+        @subjects[sub.type].delete(sub.to_s)
+
+        @id_index.delete(sub.id) if sub.id
+
+        if sub.radical?
+          @radicals.delete_if { |r| r.to_s == sub.to_s}
+        elsif sub.kanji?
+          @kanji.delete_if { |k| k.to_s == sub.to_s}
+        elsif sub.vocabulary?
+          @vocab.delete_if { |v| v.to_s == sub.to_s}
+          @kanji_vocab.delete_if { |v| v.to_s == sub.to_s} if sub.is_only_kanji?
+          @kanji_vocab_compounds.delete_if { |v| v.to_s == sub.to_s} if sub.is_compound?
+        end
+        stats.reset!
+        sub
       end
 
       def radicals
