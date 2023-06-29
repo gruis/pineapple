@@ -15,8 +15,30 @@ module Gruis
         $stderr.puts yield if block_given?
       end
 
-      # kanji frequency
-      def four
+      def suggestions(subject)
+        trunk.kanji_comps_for(subject).map(&:to_s) 
+          .map do |c| 
+            [
+              c, 
+              # average frequency for each kanji in the compound
+              compound_freqs[c], 
+              # average frequency for each kanji except the target kanji
+              compound_freq(*c.each_char.reject { |k| k == subject.to_s })
+            ] 
+          end
+          .sort_by { |cf| cf.last }
+      end
+
+      def suggestions_one(*subjects)
+        subjects.map { |s| trunk.kanji_comps_for(s).map(&:to_s) }
+          .reduce {|a,b| a & b }
+      end
+
+      def kanji_freqs
+        @kanji_freq ||= kanji_freqs!
+      end
+
+      def kanji_freqs!
         freqs = Hash[trunk.kanji.map { |k| [k.to_s, 1] }]
         ttlcomps = (trunk.kanji_vocab_compounds.length).to_f
         freqs.keys.each do |k|
@@ -28,9 +50,83 @@ module Gruis
             freqs[k] = ratio
           end
         end
-        freqs = freqs.sort_by {|k,v| v }.to_h
-        puts freqs
-        freqs
+        freqs.sort_by {|k,v| v }.to_h
+      end
+
+      def compound_freq(*kanjis)
+        kanjis = kanjis.map(&:to_s)
+        cnt    = kanjis.length.to_f
+        freqs  = kanjis.map { |k| kanji_freqs[k] || 0 }
+        total  = freqs.reduce(&:+)
+        freq   = total / cnt
+      end
+
+      def compound_freqs
+        @compound_freq ||= compound_freq!
+      end
+
+      def compound_freqs!
+        kanji_freqs = kanji_freqs
+        compounds = trunk.kanji_vocab_compounds.map do |c|
+         [c.to_s, compound_freq(*trunk.kanjis_for(c))]
+        end
+        Hash[compounds.sort_by{ |f| f.last }]
+      end
+
+      # summarize the results of a mason builder run - good for quickly
+      # comparing efficiency of each algorithm
+      def summarize
+        data = yield
+        data.map {|k,v| 
+          [
+            k, 
+            {
+              cnt: v.respond_to?(:length) && v.length,
+              #kanji: v.keys.join(""),
+              kanji_cnt: v.keys.join("").length,
+              #kanji_uniq: v.keys.join("").each_char.uniq.join(""),
+              kanji_uniq_cnt: v.keys.join("").each_char.uniq.length,
+            }
+          ] 
+        }
+      end
+
+      # kanji frequency
+      def four
+        kanji_unused = {}
+        kanji_used   = {}
+        study_list   = {}
+
+        kanji_list   = kanji_freqs.drop_while do |k,f| 
+          # any compound with a frequency of 0 are not used in a compound, so
+          # skip them, but keep a record
+          if f == 0 
+            kanji_unused[k] = f 
+            true
+          end
+        end
+
+        kanji_list.each do |k, f|
+          # sort the suggested compounds by the frequency of the kanji in the
+          # compound that are not `k`, from lowest to highest. we are
+          # prioritizing the compounds that contain kanji, which are used in the
+          # fewest other compounds
+          #
+          # then find the first compound made up entirely of kanji that are not
+          # already in our study list
+          comp = suggestions(k).sort_by { |cf| cf.last }
+            .find { |cf| cf[0].each_char.none? { |k| kanji_used[k] } }
+          if comp
+            study_list[comp[0]] = comp[1] # record the composite frequency for the compound
+            comp[0].each_char { |k| kanji_used[k] = kanji_freqs[k] }
+          end
+        end
+        kanji_list.each { |k,f| kanji_unused[k] = f unless kanji_used[k] }
+        {
+          study_list: study_list,
+          kanji_used: kanji_used,
+          kanji_unused: kanji_unused,
+        }
       end
 
       # collision frequency
@@ -114,9 +210,10 @@ module Gruis
           end
         end
 
+        visited = Hash[kanji_visits.select { |k,v| v }.keys.map {|k| [k, kanji_freqs[k]] }]
+        not_visited = Hash[kanji_visits.select { |k,v| !v }.keys.map { |k| [k, kanji_freqs[k]] }]
+        study_list = Hash[study_list.map { |c| [c, compound_freqs[c] ]}]
         log do
-          visited = kanji_visits.select { |k,v| v }.keys
-          not_visited = kanji_visits.select { |k,v| !v }.keys
           "=========\n" +
           "  END\n" +
           "---------\n" +
@@ -128,6 +225,11 @@ module Gruis
           "study list:\n#{study_list.inspect}\n#{study_list.length}\n" +
           "=========\n" 
         end
+        {
+          study_list: study_list,
+          kanji_used: visited,
+          kanji_unused: not_visited,
+        }
       end
     end
   end
