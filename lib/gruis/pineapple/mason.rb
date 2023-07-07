@@ -4,6 +4,15 @@ module Gruis
 
       attr_reader :trunk
 
+      # primary goal: make a word list that contains all available kanji with 
+      #               no repeats
+      # fall back goal: make a word list that contains all available kanji 
+      #                 with as few repeats as possible
+      # secondary goal: determine if it is possible to make a word list that
+      #                 contains all available kanji with no repeats
+
+      # alternative strategy: build all possible word lists
+
       def initialize(trunk, log: false)
         @log   = log
         @trunk = trunk
@@ -59,7 +68,7 @@ module Gruis
         kanji_used   = {}
         study_list   = {}
 
-        kanji_list   = kanji_freqs.drop_while do |k,f| 
+        kanji_list   = trunk.stats.kanji_freqs.drop_while do |k,f| 
           # any compound with a frequency of 0 are not used in a compound, so
           # skip them, but keep a record
           if f == 0 
@@ -68,7 +77,11 @@ module Gruis
           end
         end
 
-
+        # for each kanji
+        # calculate word frequency
+        # take a word that is made entirely of unseen kanji
+        # add all kanji in the word to the list of seen kanji
+        # repeat until we've gone through all kannji
       end
 
       # kanji frequency
@@ -190,9 +203,9 @@ module Gruis
           end
         end
 
-        visited = Hash[kanji_visits.select { |k,v| v }.keys.map {|k| [k, kanji_freqs[k]] }]
-        not_visited = Hash[kanji_visits.select { |k,v| !v }.keys.map { |k| [k, kanji_freqs[k]] }]
-        study_list = Hash[study_list.map { |c| [c, compound_freqs[c] ]}]
+        visited     = Hash[kanji_visits.select { |k,v| v }.keys.map {|k| [k, trunk.stats.kanji_freqs[k]] }]
+        not_visited = Hash[kanji_visits.select { |k,v| !v }.keys.map { |k| [k, trunk.stats.kanji_freqs[k]] }]
+        study_list  = Hash[study_list.map { |c| [c, trunk.stats.compound_freqs[c] ]}]
         log do
           "=========\n" +
           "  END\n" +
